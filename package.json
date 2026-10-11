@@ -1,0 +1,23 @@
+{
+  "name": "wavelet-retail-ai",
+  "version": "1.0.0",
+  "description": "Multi-resolution retail demand forecasting and scenario simulation platform (Dual-RF DB4)",
+  "main": "start.js",
+  "scripts": {
+    "start": "node start.js",
+    "server": "cd server && npm start",
+    "server:dev": "cd server && npm run dev",
+    "ml": "cd ml-service && python main.py",
+    "postinstall": "npm --prefix server install"
+  },
+  "keywords": [
+    "retail",
+    "demand-forecasting",
+    "wavelet",
+    "random-forest",
+    "fastapi",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC"
+}

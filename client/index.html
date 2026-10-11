@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wavelet Retail AI — Multi-Resolution Demand Forecasting</title>
+  <meta name="description" content="Enterprise retail demand forecasting platform combining Discrete Wavelet Transforms (db4) with Dual Random Forest Regressors for structural trends and transient shocks.">
+
+  <!-- Google Fonts: Preconnect & display=swap -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome 6.5.1 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Pinned Chart.js and Official Plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+  <!-- Design System Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Immediate Theme Pre-Paint Guard (Eliminates FOUT) -->
+  <script>
+    (function() {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        var t = p.get('theme') || localStorage.getItem('wavelet_theme');
+        if (t === 'paper') document.documentElement.setAttribute('data-theme', 'paper');
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+
+  <div class="app-shell">
+
+    <!-- ============================================================= -->
+    <!-- SLIM COLLAPSIBLE LEFT ICON RAIL -->
+    <!-- ============================================================= -->
+    <aside class="side-rail" id="side-rail" aria-label="Main Navigation">
+      <!-- Rail Header / Logo -->
+      <div class="rail-brand">
+        <div class="brand-icon-box" title="Wavelet Retail AI">
+          <i class="fa-solid fa-water"></i>
+        </div>
+        <div class="rail-brand-text">
+          <span class="rail-brand-title">
+            WAVELET AI <span class="model-badge">DUAL-RF DB4</span>
+          </span>
+          <span style="font-size:0.7rem; color:var(--text-muted);">Multi-Resolution Core</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="rail-nav">
+        <button type="button" class="rail-item active" data-tab="analytics" id="rail-btn-analytics" title="Demand Analytics & KPIs">
+          <span class="rail-icon"><i class="fa-solid fa-chart-line"></i></span>
+          <span class="rail-label">Analytics & KPIs</span>
+        </button>
+
+        <button type="button" class="rail-item" data-tab="wavelet" id="rail-btn-wavelet" title="Wavelet Decomposition Lab">
+          <span class="rail-icon"><i class="fa-solid fa-wave-square"></i></span>
+          <span class="rail-label">Wavelet Lab</span>
+        </button>
+
+        <button type="button" class="rail-item" data-tab="simulator" id="rail-btn-simulator" title="Scenario Simulator">
+          <span class="rail-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+          <span class="rail-label">Simulator</span>
+        </button>
+
+        <button type="button" class="rail-item" data-tab="governance" id="rail-btn-governance" title="Model Governance & Drift">
+          <span class="rail-icon"><i class="fa-solid fa-brain"></i></span>
+          <span class="rail-label">Governance</span>
+        </button>
+
+        <button type="button" class="rail-item" data-tab="explorer" id="rail-btn-explorer" title="Historical Dataset Explorer">
+          <span class="rail-icon"><i class="fa-solid fa-table-list"></i></span>
+          <span class="rail-label">Data Explorer</span>
+        </button>
+      </nav>
+
+      <!-- Rail Footer -->
+      <div class="rail-footer">
+        <div style="font-size:0.68rem; color:var(--text-muted); text-align:center;" class="rail-label">
+          v1.0.4 • Dual-RF db4
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============================================================= -->
+    <!-- MAIN WORKSPACE VIEW -->
+    <!-- ============================================================= -->
+    <div class="main-wrapper">
+
+      <!-- TOP BAR -->
+      <header class="top-bar">
+        <div class="topbar-left">
+          <div class="page-title-group">
+            <div class="breadcrumbs" id="topbar-breadcrumb">Platform / Demand Analytics & KPIs</div>
+            <h1 id="topbar-page-title">Demand Analytics & KPIs</h1>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Command Palette Trigger Button -->
+          <button type="button" class="btn-cmd-palette" id="btn-open-cmd-palette" title="Open Command Palette (Ctrl+K)">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Quick Jump...</span>
+            <span class="cmd-shortcut">⌘K</span>
+          </button>
+
+          <!-- Theme Toggle Button -->
+          <button type="button" class="btn-theme-toggle" id="btn-toggle-theme" title="Toggle Theme (Ink / Paper)">
+            <i class="fa-solid fa-circle-half-stroke"></i>
+          </button>
+
+          <!-- Interactive Status Component -->
+          <div class="status-pill-container">
+            <button type="button" class="status-pill" id="status-pill-trigger" title="Click to view runtime health">
+              <span class="status-dot" id="status-dot-indicator"></span>
+              <span id="status-text-label">Connecting...</span>
+            </button>
+
+            <!-- Status Details Popover -->
+            <div class="status-popover" id="status-popover-box" role="dialog" aria-label="Service Health Details">
+              <div style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); font-weight:700;">
+                Runtime Governance
+              </div>
+              <div class="status-row">
+                <span>Model Pipeline:</span>
+                <span id="pop-model-version">Dual-RF db4</span>
+              </div>
+              <div class="status-row">
+                <span>FastAPI Service:</span>
+                <span id="pop-server-status">Connecting...</span>
+              </div>
+              <div class="status-row">
+                <span>Live Latency:</span>
+                <span id="pop-latency-val">-- ms</span>
+              </div>
+              <div class="status-row">
+                <span>Decomposition:</span>
+                <span>PyWavelets DWT</span>
+              </div>
+              <div class="status-row">
+                <span>Active Dataset:</span>
+                <span>76,000 records</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- STICKY FROSTED-GLASS FILTER BAR -->
+      <section class="filter-bar" aria-label="Global Dimension Filters">
+        <div class="filter-controls-row">
+          <div class="comboboxes-group">
+            <!-- Store Combobox -->
+            <div id="cb-store"></div>
+
+            <!-- Product Combobox -->
+            <div id="cb-product"></div>
+
+            <!-- Category Combobox -->
+            <div id="cb-category"></div>
+
+            <!-- Region Combobox -->
+            <div id="cb-region"></div>
+
+            <!-- Weather Combobox (Defaults to All Weather) -->
+            <div id="cb-weather"></div>
+
+            <!-- Seasonality Combobox (Defaults to All Seasons) -->
+            <div id="cb-seasonality"></div>
+
+            <!-- Custom Date Range Picker -->
+            <div id="dp-range-wrapper"></div>
+          </div>
+
+          <!-- Reset Filter Button -->
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button type="button" class="btn-cmd-palette" id="btn-reset-all-filters" title="Reset all dimension filters">
+              <i class="fa-solid fa-rotate-left"></i>
+              <span>Reset</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Active Filter Chips Row -->
+        <div class="filter-chips-row">
+          <span class="chips-label">Active:</span>
+          <span class="model-badge" id="active-filters-count-badge" style="display:none; font-size:0.65rem;">0 Active</span>
+          <div id="filter-chips-container" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;"></div>
+        </div>
+      </section>
+
+      <!-- MAIN CONTENT VIEW AREA -->
+      <main class="main-content">
+
+        <!-- Screen reader live announcer -->
+        <div id="kpi-live-announcer" class="sr-only" aria-live="polite" style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0);"></div>
+
+        <!-- ========================================================= -->
+        <!-- TAB 1: DEMAND ANALYTICS & KPIS -->
+        <!-- ========================================================= -->
+        <section class="tab-pane active" id="tab-analytics" role="tabpanel">
+          
+          <!-- Asymmetric Redesigned KPI Cards -->
+          <div class="kpis-asymmetric-grid">
+            
+            <!-- Hero Card: Total Demand (2 Columns) -->
+            <div class="kpi-card hero selected-series" id="card-kpi-total" data-metric="totalDemand" title="Click to isolate in main chart">
+              <div>
+                <div class="kpi-header">
+                  <span class="kpi-label">Total Volume Demand</span>
+                  <div class="kpi-icon-square"><i class="fa-solid fa-boxes-stacked"></i></div>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-main-number" id="kpi-val-total">----</span>
+                  <span class="kpi-unit">units</span>
+                </div>
+              </div>
+              <div>
+                <div class="kpi-footer-row">
+                  <div id="kpi-delta-total"></div>
+                  <div class="kpi-sparkline" id="sparkline-total"></div>
+                </div>
+                <div class="kpi-desc">Aggregated retail volume demanded</div>
+              </div>
+            </div>
+
+            <!-- Standard Card: Avg Daily Demand -->
+            <div class="kpi-card standard" id="card-kpi-daily" data-metric="avgDailyDemand" title="Click to isolate in main chart">
+              <div>
+                <div class="kpi-header">
+                  <span class="kpi-label">Avg Daily Demand</span>
+                  <div class="kpi-icon-square"><i class="fa-solid fa-calendar-day"></i></div>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-main-number" id="kpi-val-daily">----</span>
+                  <span class="kpi-unit">u/day</span>
+                </div>
+              </div>
+              <div>
+                <div class="kpi-footer-row">
+                  <div id="kpi-delta-daily"></div>
+                  <div class="kpi-sparkline" id="sparkline-daily"></div>
+                </div>
+                <div class="kpi-desc">Across calendar days monitored</div>
+              </div>
+            </div>
+
+            <!-- Standard Card: Avg Demand / Record -->
+            <div class="kpi-card standard" id="card-kpi-record" data-metric="avgDemandPerRecord" title="Click to isolate in main chart">
+              <div>
+                <div class="kpi-header">
+                  <span class="kpi-label">Avg / Record</span>
+                  <div class="kpi-icon-square"><i class="fa-solid fa-chart-simple"></i></div>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-main-number" id="kpi-val-record">----</span>
+                  <span class="kpi-unit">units</span>
+                </div>
+              </div>
+              <div>
+                <div class="kpi-footer-row">
+                  <div id="kpi-delta-record"></div>
+                  <div class="kpi-sparkline" id="sparkline-record"></div>
+                </div>
+                <div class="kpi-desc">Store-SKU daily transaction mean</div>
+              </div>
+            </div>
+
+            <!-- Standard Card: Stores Active -->
+            <div class="kpi-card standard" id="card-kpi-stores">
+              <div>
+                <div class="kpi-header">
+                  <span class="kpi-label">Active Stores</span>
+                  <div class="kpi-icon-square"><i class="fa-solid fa-store"></i></div>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-main-number" id="kpi-val-stores">----</span>
+                  <span class="kpi-unit">branches</span>
+                </div>
+              </div>
+              <div>
+                <div class="kpi-footer-row">
+                  <div id="kpi-delta-stores"></div>
+                </div>
+                <div class="kpi-desc">Physical retail storefronts</div>
+              </div>
+            </div>
+
+            <!-- Standard Card: Product Catalog -->
+            <div class="kpi-card standard" id="card-kpi-products">
+              <div>
+                <div class="kpi-header">
+                  <span class="kpi-label">Product SKUs</span>
+                  <div class="kpi-icon-square"><i class="fa-solid fa-tags"></i></div>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-main-number" id="kpi-val-products">----</span>
+                  <span class="kpi-unit">items</span>
+                </div>
+              </div>
+              <div>
+                <div class="kpi-footer-row">
+                  <div id="kpi-delta-products"></div>
+                </div>
+                <div class="kpi-desc">Merchandise catalog breadth</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 12-Column Dashboard Grid: Main Chart + Category Donut -->
+          <div class="dashboard-grid-12">
+            
+            <!-- Main Demand Dynamics Chart (8 Cols) -->
+            <div class="card col-8">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2>
+                    <i class="fa-solid fa-chart-line" style="color:var(--accent-primary);"></i>
+                    Historical Demand & Pricing Dynamics
+                  </h2>
+                  <div class="card-subtitle">Monotone demand trajectory (zero baseline) with price overlay and coral forecast confidence band</div>
+                </div>
+                <div class="card-actions-menu">
+                  <button type="button" class="btn-icon" id="btn-export-demand-png" title="Export as PNG">
+                    <i class="fa-solid fa-image"></i>
+                  </button>
+                  <button type="button" class="btn-icon" id="btn-export-demand-csv" title="Export Series CSV">
+                    <i class="fa-solid fa-file-csv"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="chart-stage tall">
+                <canvas id="main-demand-chart"></canvas>
+              </div>
+            </div>
+
+            <!-- Category Demand Share Donut (4 Cols) -->
+            <div class="card col-4">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h3>
+                    <i class="fa-solid fa-chart-pie" style="color:var(--accent-secondary);"></i>
+                    Category Demand Share
+                  </h3>
+                  <div class="card-subtitle">8-color accessible palette with interactive filter-on-click</div>
+                </div>
+                <div class="card-actions-menu">
+                  <button type="button" class="btn-icon" id="btn-toggle-donut-view" title="Toggle Donut / Ranked Bars">
+                    <i class="fa-solid fa-chart-bar"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="donut-container">
+                <div class="chart-stage" style="height:210px; position:relative;">
+                  <canvas id="category-donut-chart"></canvas>
+                  <div class="donut-center-metric">
+                    <div class="donut-center-val" id="donut-center-units">--</div>
+                    <div class="donut-center-sub" id="donut-center-label">Total Units</div>
+                  </div>
+                </div>
+                <!-- Interactive Side/Bottom Legend -->
+                <div class="donut-legend-list" id="donut-custom-legend"></div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- TAB 2: WAVELET DECOMPOSITION LAB -->
+        <!-- ========================================================= -->
+        <section class="tab-pane" id="tab-wavelet" role="tabpanel">
+          
+          <!-- Wavelet Controls Strip -->
+          <div class="wavelet-controls-strip">
+            <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+              <div>
+                <label for="wavelet-store-select" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Store</label>
+                <select id="wavelet-store-select" class="combobox-trigger" style="min-width:110px;"></select>
+              </div>
+              <div>
+                <label for="wavelet-product-select" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">SKU</label>
+                <select id="wavelet-product-select" class="combobox-trigger" style="min-width:110px;"></select>
+              </div>
+              <div>
+                <label for="wavelet-filter-type" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Wavelet Filter</label>
+                <select id="wavelet-filter-type" class="combobox-trigger">
+                  <option value="db4">Daubechies 4 (db4)</option>
+                  <option value="db2">Daubechies 2 (db2)</option>
+                  <option value="haar">Haar</option>
+                </select>
+              </div>
+              <div>
+                <label for="wavelet-level-select" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Decomposition Level</label>
+                <select id="wavelet-level-select" class="combobox-trigger">
+                  <option value="1">Level 1 (cA + cD)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+              <button type="button" class="btn-primary" id="btn-run-wavelet-decomp">
+                <i class="fa-solid fa-wave-square"></i> Decompose Signal
+              </button>
+            </div>
+          </div>
+
+          <!-- Stacked Small-Multiple Decomposition Tracks (Shared X Axis) -->
+          <div class="wavelet-track-container">
+            
+            <!-- Track 1: Original Demand S(t) -->
+            <div class="wavelet-sub-track">
+              <div class="wavelet-track-meta">
+                <div>
+                  <span class="track-pill raw">Level 0 • Original Signal S(t)</span>
+                  <span style="font-size:0.8rem; color:var(--text-secondary); margin-left:0.65rem;">Aggregated observed demand time-series</span>
+                </div>
+                <span class="mono" style="font-size:0.75rem; color:var(--text-muted);" id="wavelet-stat-timesteps">760 timesteps</span>
+              </div>
+              <div class="chart-stage" style="height:190px;">
+                <canvas id="wavelet-raw-track-chart"></canvas>
+              </div>
+            </div>
+
+            <!-- Track 2: Approximation cA (Low Frequency Trend) -->
+            <div class="wavelet-sub-track" style="border-color: rgba(200, 240, 60, 0.25);">
+              <div class="wavelet-track-meta">
+                <div>
+                  <span class="track-pill trend">Approximation cA • Macro Trend</span>
+                  <span style="font-size:0.8rem; color:var(--text-secondary); margin-left:0.65rem;">Low-frequency baseline: economic trend, price elasticity & seasonal cycle</span>
+                </div>
+                <span class="mono" style="font-size:0.75rem; color:var(--accent-primary);" id="wavelet-stat-coeffs">383 coefficients</span>
+              </div>
+              <div class="chart-stage" style="height:190px;">
+                <canvas id="wavelet-trend-track-chart"></canvas>
+              </div>
+            </div>
+
+            <!-- Track 3: Detail cD (High Frequency Transient Spikes) -->
+            <div class="wavelet-sub-track" style="border-color: rgba(255, 107, 74, 0.25);">
+              <div class="wavelet-track-meta">
+                <div>
+                  <span class="track-pill spikes">Detail cD • Transient Spikes</span>
+                  <span style="font-size:0.8rem; color:var(--text-secondary); margin-left:0.65rem;">High-frequency shocks: promotional flash events, discount surges & weather anomalies</span>
+                </div>
+                <span class="mono" style="font-size:0.75rem; color:var(--accent-secondary);">Orthonormal db4</span>
+              </div>
+              <div class="chart-stage" style="height:190px;">
+                <canvas id="wavelet-spike-track-chart"></canvas>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- TAB 3: SCENARIO SIMULATOR -->
+        <!-- ========================================================= -->
+        <section class="tab-pane" id="tab-simulator" role="tabpanel">
+          <div class="simulator-columns">
+            
+            <!-- Left Controls Column -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2><i class="fa-solid fa-sliders" style="color:var(--accent-primary);"></i> Scenario Parameter Studio</h2>
+                  <div class="card-subtitle">Adjust market parameters to simulate dual-model forecast impact</div>
+                </div>
+              </div>
+
+              <!-- Store & Product -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem; margin-bottom:1rem;">
+                <div>
+                  <label for="sim-select-store" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Store</label>
+                  <select id="sim-select-store" class="combobox-trigger" style="width:100%;"></select>
+                </div>
+                <div>
+                  <label for="sim-select-product" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Product</label>
+                  <select id="sim-select-product" class="combobox-trigger" style="width:100%;"></select>
+                </div>
+              </div>
+
+              <!-- Price Slider -->
+              <div class="sim-slider-row">
+                <div class="sim-slider-header">
+                  <label for="sim-slider-price">Store Unit Price</label>
+                  <span class="sim-slider-val" id="sim-val-price">$50.0</span>
+                </div>
+                <input type="range" id="sim-slider-price" class="slider-custom" min="10" max="150" step="1" value="50">
+              </div>
+
+              <!-- Competitor Price -->
+              <div class="sim-slider-row">
+                <div class="sim-slider-header">
+                  <label for="sim-slider-comp">Competitor Pricing</label>
+                  <span class="sim-slider-val" id="sim-val-comp">$52.0</span>
+                </div>
+                <input type="range" id="sim-slider-comp" class="slider-custom" min="10" max="150" step="1" value="52">
+              </div>
+
+              <!-- Inventory Level -->
+              <div class="sim-slider-row">
+                <div class="sim-slider-header">
+                  <label for="sim-slider-inv">Stock / Inventory Level</label>
+                  <span class="sim-slider-val" id="sim-val-inv">150</span>
+                </div>
+                <input type="range" id="sim-slider-inv" class="slider-custom" min="20" max="500" step="5" value="150">
+              </div>
+
+              <!-- Promo & Discount -->
+              <div style="display:grid; grid-template-columns:1fr 1.5fr; gap:0.85rem; margin-bottom:1rem;">
+                <div>
+                  <label for="sim-select-promo" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Promotion</label>
+                  <select id="sim-select-promo" class="combobox-trigger" style="width:100%;">
+                    <option value="0">Off (None)</option>
+                    <option value="1">Active Campaign</option>
+                  </select>
+                </div>
+                <div class="sim-slider-row" style="margin-bottom:0;">
+                  <div class="sim-slider-header">
+                    <label for="sim-slider-discount">Discount %</label>
+                    <span class="sim-slider-val" id="sim-val-discount">5%</span>
+                  </div>
+                  <input type="range" id="sim-slider-discount" class="slider-custom" min="0" max="50" step="1" value="5">
+                </div>
+              </div>
+
+              <!-- Weather & Seasonality -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem; margin-bottom:1rem;">
+                <div>
+                  <label for="sim-select-weather" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Weather Shock</label>
+                  <select id="sim-select-weather" class="combobox-trigger" style="width:100%;">
+                    <option value="Sunny">Sunny</option>
+                    <option value="Cloudy">Cloudy</option>
+                    <option value="Rainy">Rainy</option>
+                    <option value="Snowy">Snowy</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="sim-select-season" style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Seasonality</label>
+                  <select id="sim-select-season" class="combobox-trigger" style="width:100%;">
+                    <option value="Summer">Summer</option>
+                    <option value="Autumn">Autumn</option>
+                    <option value="Winter">Winter</option>
+                    <option value="Spring">Spring</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Epidemic Index -->
+              <div class="sim-slider-row">
+                <div class="sim-slider-header">
+                  <label for="sim-slider-epidemic">Epidemic / Disruption Index</label>
+                  <span class="sim-slider-val" id="sim-val-epidemic">0.0</span>
+                </div>
+                <input type="range" id="sim-slider-epidemic" class="slider-custom" min="0" max="1" step="0.1" value="0.0">
+              </div>
+
+              <!-- Buttons -->
+              <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
+                <button type="button" class="btn-primary" id="btn-run-sim-forecast" style="flex:1; justify-content:center; padding:0.65rem;">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Run AI Simulation
+                </button>
+                <button type="button" class="btn-cmd-palette" id="btn-save-scenario" title="Save Scenario">
+                  <i class="fa-solid fa-bookmark"></i> Save
+                </button>
+              </div>
+            </div>
+
+            <!-- Right Simulation HUD & Baseline Comparison Column -->
+            <div style="display:flex; flex-direction:column; gap:1.25rem;">
+              
+              <!-- Delta Summary Box -->
+              <div class="delta-summary-box">
+                <div>
+                  <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); font-weight:600;">Projected Demand Units</div>
+                  <div style="font-family:var(--font-brand); font-size:2rem; font-weight:700; color:var(--text-primary); margin:0.25rem 0;" id="sim-hero-demand-val">--</div>
+                  <div style="font-size:0.75rem;" id="sim-delta-units">-- vs Baseline</div>
+                </div>
+                <div>
+                  <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); font-weight:600;">Projected Revenue Impact</div>
+                  <div style="font-family:var(--font-brand); font-size:2rem; font-weight:700; color:var(--accent-tertiary); margin:0.25rem 0;">Simulation</div>
+                  <div style="font-size:0.75rem;" id="sim-delta-revenue">-- vs Baseline</div>
+                </div>
+              </div>
+
+              <!-- Live Baseline vs Scenario Comparison Chart -->
+              <div class="card" style="flex:1;">
+                <div class="card-header">
+                  <div class="card-title-group">
+                    <h3><i class="fa-solid fa-code-compare" style="color:var(--accent-secondary);"></i> Baseline vs Scenario Comparison</h3>
+                    <div class="card-subtitle">Warm sand baseline curve vs hot coral scenario forecast</div>
+                  </div>
+                </div>
+                <div class="chart-stage" style="height:260px;">
+                  <canvas id="sim-comparison-chart"></canvas>
+                </div>
+              </div>
+
+              <!-- Saved Scenarios List -->
+              <div class="card">
+                <div class="card-header" style="margin-bottom:0.6rem;">
+                  <div class="card-title-group">
+                    <h3 style="font-size:0.88rem;"><i class="fa-solid fa-clock-rotate-left"></i> Scenario Comparison List</h3>
+                  </div>
+                </div>
+                <div id="sim-saved-scenarios-list" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- TAB 4: MODEL GOVERNANCE -->
+        <!-- ========================================================= -->
+        <section class="tab-pane" id="tab-governance" role="tabpanel">
+          
+          <div class="dashboard-grid-12">
+            
+            <!-- Trend Model Fit Card (4 Cols) -->
+            <div class="card col-4" style="border-top:3px solid var(--accent-primary);">
+              <div class="card-header">
+                <div>
+                  <h3>RF_Trend Model (cA)</h3>
+                  <div class="card-subtitle">Estimates baseline macro structural trend</div>
+                </div>
+                <span class="model-badge" style="background:var(--accent-primary-dim); color:var(--accent-primary); border-color:var(--accent-primary);">100 Trees</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.65rem; font-size:0.82rem;">
+                <div class="status-row"><span>R² Goodness of Fit:</span><span id="gov-metric-trend-r2" class="num">0.082</span></div>
+                <div class="status-row"><span>Mean Squared Error (MSE):</span><span id="gov-metric-trend-mse" class="num">2763.2</span></div>
+                <div class="status-row"><span>Mean Absolute Error (MAE):</span><span id="gov-metric-trend-mae" class="num">41.3</span></div>
+                <div class="status-row"><span>Target Coefficient:</span><span class="mono">cA (Approximation)</span></div>
+              </div>
+            </div>
+
+            <!-- Spikes Model Fit Card (4 Cols) -->
+            <div class="card col-4" style="border-top:3px solid var(--accent-secondary);">
+              <div class="card-header">
+                <div>
+                  <h3>RF_Spikes Model (cD)</h3>
+                  <div class="card-subtitle">Estimates transient promotional/weather shocks</div>
+                </div>
+                <span class="model-badge">100 Trees</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.65rem; font-size:0.82rem;">
+                <div class="status-row"><span>R² Goodness of Fit:</span><span id="gov-metric-spike-r2" class="num">-0.013</span></div>
+                <div class="status-row"><span>Mean Squared Error (MSE):</span><span id="gov-metric-spike-mse" class="num">1463.6</span></div>
+                <div class="status-row"><span>Mean Absolute Error (MAE):</span><span id="gov-metric-spike-mae" class="num">29.4</span></div>
+                <div class="status-row"><span>Target Coefficient:</span><span class="mono">cD (Detail)</span></div>
+              </div>
+            </div>
+
+            <!-- Reconstructed Signal Fit Card (4 Cols) -->
+            <div class="card col-4" style="border-top:3px solid var(--accent-tertiary);">
+              <div class="card-header">
+                <div>
+                  <h3>Reconstructed Total Signal</h3>
+                  <div class="card-subtitle">Synthesized inverse DWT: IDWT(cA, cD)</div>
+                </div>
+                <span class="model-badge" style="background:var(--accent-tertiary-dim); color:var(--accent-tertiary); border-color:var(--accent-tertiary);">Synthesized</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.65rem; font-size:0.82rem;">
+                <div class="status-row"><span>Overall Reconstructed R²:</span><span id="gov-metric-rec-r2" class="num">0.055</span></div>
+                <div class="status-row"><span>Overall Signal MSE:</span><span id="gov-metric-rec-mse" class="num">2121.7</span></div>
+                <div class="status-row"><span>Holdout Validation:</span><span class="num">7,660 samples</span></div>
+                <div class="status-row"><span>Model Status:</span><span style="color:var(--trend-up); font-weight:700;">Active Production</span></div>
+              </div>
+            </div>
+
+            <!-- Dual Feature Importance Charts -->
+            <div class="card col-6">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h3><i class="fa-solid fa-arrow-trend-up" style="color:var(--accent-primary);"></i> Macro Trend Gini Feature Importance (RF_Trend)</h3>
+                  <div class="card-subtitle">Relative weights for Price, Competitor Pricing, Inventory and Seasonality</div>
+                </div>
+              </div>
+              <div class="chart-stage" style="height:260px;">
+                <canvas id="gov-trend-importance-chart"></canvas>
+              </div>
+            </div>
+
+            <div class="card col-6">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h3><i class="fa-solid fa-bolt" style="color:var(--accent-secondary);"></i> Transient Spikes Gini Feature Importance (RF_Spikes)</h3>
+                  <div class="card-subtitle">Relative weights for Promotions, Discounts, Epidemics and Weather Shocks</div>
+                </div>
+              </div>
+              <div class="chart-stage" style="height:260px;">
+                <canvas id="gov-spike-importance-chart"></canvas>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- TAB 5: DATA EXPLORER -->
+        <!-- ========================================================= -->
+        <section class="tab-pane" id="tab-explorer" role="tabpanel">
+          <div class="card">
+            
+            <!-- Table Toolbar -->
+            <div class="table-toolbar">
+              <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap:wrap;">
+                <div style="position:relative; min-width:260px;">
+                  <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); color:var(--text-muted);"></i>
+                  <input type="text" id="table-search-box" class="combobox-search" style="padding-left:2.2rem;" placeholder="Search store, SKU, category, date...">
+                </div>
+                <button type="button" class="btn-cmd-palette" id="btn-toggle-density" title="Toggle Comfortable/Compact Density">
+                  <i class="fa-solid fa-bars-staggered"></i> Density
+                </button>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <button type="button" class="btn-primary" id="btn-export-csv-table">
+                  <i class="fa-solid fa-download"></i> Export Filtered CSV
+                </button>
+              </div>
+            </div>
+
+            <!-- Virtualized Table Container -->
+            <div class="table-responsive-wrapper">
+              <table class="virtual-table" id="explorer-table">
+                <thead>
+                  <tr>
+                    <th data-sort="date">Date <i class="fa-solid fa-sort" style="font-size:0.7rem;"></i></th>
+                    <th data-sort="storeId">Store <i class="fa-solid fa-sort" style="font-size:0.7rem;"></i></th>
+                    <th data-sort="productId">SKU <i class="fa-solid fa-sort" style="font-size:0.7rem;"></i></th>
+                    <th data-sort="category">Category</th>
+                    <th data-sort="region">Region</th>
+                    <th data-sort="price">Price ($)</th>
+                    <th data-sort="discount">Discount</th>
+                    <th>Weather</th>
+                    <th>Season</th>
+                    <th data-sort="demand">Demand Units</th>
+                  </tr>
+                </thead>
+                <tbody id="explorer-table-tbody">
+                  <!-- Populated via explorerTab.js -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; font-size:0.8rem; color:var(--text-muted);">
+              <div id="explorer-page-info">Loading records...</div>
+              <div style="display:flex; gap:0.4rem;">
+                <button type="button" class="btn-cmd-palette" id="btn-table-prev"><i class="fa-solid fa-chevron-left"></i> Previous</button>
+                <button type="button" class="btn-cmd-palette" id="btn-table-next">Next <i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- Command Palette Modal (Ctrl/Cmd + K) -->
+  <div class="cmd-modal-backdrop" id="cmd-palette-backdrop" role="dialog" aria-modal="true" aria-label="Command Palette">
+    <div class="cmd-modal-box">
+      <input type="text" class="cmd-search-input" id="cmd-search-input" placeholder="Type a command or jump to view..." aria-label="Command search">
+      <div class="cmd-list" id="cmd-list-container"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications Shelf -->
+  <div class="toast-shelf" id="toast-shelf"></div>
+
+  <!-- Application Entry Point (ES Module) -->
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>

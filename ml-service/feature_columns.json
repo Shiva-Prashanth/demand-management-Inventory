@@ -1,0 +1,88 @@
+{
+  "macro_features": [
+    "Price",
+    "Competitor Pricing",
+    "Inventory Level",
+    "Seasonality_Spring",
+    "Seasonality_Summer",
+    "Seasonality_Winter"
+  ],
+  "transient_features": [
+    "Promotion",
+    "Discount",
+    "Epidemic",
+    "Weather Condition_Rainy",
+    "Weather Condition_Snowy",
+    "Weather Condition_Sunny"
+  ],
+  "categorical_columns": [
+    "Category",
+    "Region",
+    "Weather Condition",
+    "Seasonality"
+  ],
+  "seasonality_encoded_cols": [
+    "Seasonality_Spring",
+    "Seasonality_Summer",
+    "Seasonality_Winter"
+  ],
+  "weather_encoded_cols": [
+    "Weather Condition_Rainy",
+    "Weather Condition_Snowy",
+    "Weather Condition_Sunny"
+  ],
+  "unique_stores": [
+    "S001",
+    "S002",
+    "S003",
+    "S004",
+    "S005"
+  ],
+  "unique_products": [
+    "P0001",
+    "P0002",
+    "P0003",
+    "P0004",
+    "P0005",
+    "P0006",
+    "P0007",
+    "P0008",
+    "P0009",
+    "P0010",
+    "P0011",
+    "P0012",
+    "P0013",
+    "P0014",
+    "P0015",
+    "P0016",
+    "P0017",
+    "P0018",
+    "P0019",
+    "P0020"
+  ],
+  "unique_categories": [
+    "Clothing",
+    "Electronics",
+    "Furniture",
+    "Groceries",
+    "Toys"
+  ],
+  "unique_regions": [
+    "East",
+    "North",
+    "South",
+    "West"
+  ],
+  "unique_weathers": [
+    "Cloudy",
+    "Rainy",
+    "Snowy",
+    "Sunny"
+  ],
+  "unique_seasonalities": [
+    "Autumn",
+    "Spring",
+    "Summer",
+    "Winter"
+  ]
+}

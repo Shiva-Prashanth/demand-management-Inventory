@@ -1,0 +1,22 @@
+{
+  "rf_trend": {
+    "mse": 2763.2246,
+    "r2": 0.0821,
+    "mae": 41.3181
+  },
+  "rf_spikes": {
+    "mse": 1463.63,
+    "r2": -0.0137,
+    "mae": 29.4355
+  },
+  "reconstructed": {
+    "mse": 2121.6719,
+    "r2": 0.0548
+  },
+  "details": {
+    "n_train_samples": 30640,
+    "n_test_samples": 7660,
+    "wavelet": "db4",
+    "model_type": "RandomForestRegressor(n_estimators=100, random_state=42)"
+  }
+}

@@ -1,0 +1,14 @@
+# Auto-detect text files and perform LF normalization on checkout
+* text=auto
+
+# Declare binary files to prevent line-ending mutations
+*.joblib binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+
+# Text datasets & metadata
+*.csv text eol=lf
+*.json text eol=lf
+*.md text eol=lf

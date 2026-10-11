@@ -1,0 +1,15 @@
+node_modules
+__pycache__
+*.py[cod]
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+*.ipynb
+docs/screenshots
+backup
+tmp
+.tmp
+.cache
+*.log

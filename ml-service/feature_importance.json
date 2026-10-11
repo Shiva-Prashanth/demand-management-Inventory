@@ -1,0 +1,54 @@
+{
+  "rf_trend": [
+    {
+      "feature": "Price",
+      "importance": 0.338
+    },
+    {
+      "feature": "Inventory Level",
+      "importance": 0.3192
+    },
+    {
+      "feature": "Competitor Pricing",
+      "importance": 0.2892
+    },
+    {
+      "feature": "Seasonality_Summer",
+      "importance": 0.023
+    },
+    {
+      "feature": "Seasonality_Winter",
+      "importance": 0.0167
+    },
+    {
+      "feature": "Seasonality_Spring",
+      "importance": 0.0138
+    }
+  ],
+  "rf_spikes": [
+    {
+      "feature": "Discount",
+      "importance": 0.3319
+    },
+    {
+      "feature": "Epidemic",
+      "importance": 0.2137
+    },
+    {
+      "feature": "Weather Condition_Rainy",
+      "importance": 0.1472
+    },
+    {
+      "feature": "Promotion",
+      "importance": 0.1166
+    },
+    {
+      "feature": "Weather Condition_Sunny",
+      "importance": 0.0998
+    },
+    {
+      "feature": "Weather Condition_Snowy",
+      "importance": 0.0908
+    }
+  ]
+}

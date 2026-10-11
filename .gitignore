@@ -1,0 +1,46 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+
+# Python & ML
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Secrets & Environment (Keep .env.example templates)
+.env
+.env.*
+!.env.example
+
+# Operating System & Editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs, Storage & Temp
+*.log
+tmp/
+.tmp/
+.cache/
+backup/
+*.orig
+
+# Build & Coverage
+dist/
+build/
+coverage/
