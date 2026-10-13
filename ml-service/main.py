@@ -294,8 +294,179 @@ def get_wavelet_decomposition(
         "aligned_spikes": [round(float(v), 2) for v in cD_upsampled]
     }
 
+store_product_cache = None
+
+def get_store_product_baselines():
+    global store_product_cache
+    if store_product_cache is not None:
+        return store_product_cache
+    if historical_df is None:
+        return []
+    pairs_df = historical_df[['Store ID', 'Product ID', 'Category', 'Region']].drop_duplicates()
+    medians = historical_df.groupby(['Store ID', 'Product ID'])[['Price', 'Competitor Pricing', 'Inventory Level', 'Discount', 'Promotion']].median().reset_index()
+    merged = pd.merge(pairs_df, medians, on=['Store ID', 'Product ID'])
+    store_product_cache = merged.to_dict('records')
+    return store_product_cache
+
+@app.get("/forecast-timeline")
+@app.post("/forecast-timeline")
+def forecast_timeline(
+    start_date: str = Query(..., description="Start date YYYY-MM-DD"),
+    end_date: str = Query(..., description="End date YYYY-MM-DD"),
+    store_id: Optional[str] = Query(None, description="Store ID or ALL"),
+    product_id: Optional[str] = Query(None, description="Product ID or ALL"),
+    category: Optional[str] = Query(None, description="Category or ALL"),
+    region: Optional[str] = Query(None, description="Region or ALL"),
+    weather: Optional[str] = Query(None, description="Weather or ALL"),
+    seasonality: Optional[str] = Query(None, description="Seasonality or ALL")
+):
+    if rf_trend is None or rf_spikes is None:
+        raise HTTPException(status_code=500, detail="Models not loaded.")
+
+    try:
+        dt_start = pd.to_datetime(start_date)
+        dt_end = pd.to_datetime(end_date)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {e}")
+
+    if dt_start > dt_end:
+        raise HTTPException(status_code=400, detail="start_date must be <= end_date")
+
+    date_range = pd.date_range(dt_start, dt_end, freq='D')
+    if len(date_range) > 730:
+        date_range = date_range[:730]
+
+    baselines = get_store_product_baselines()
+    if not baselines:
+        raise HTTPException(status_code=500, detail="Store/Product baselines not available.")
+
+    filtered_pairs = []
+    for b in baselines:
+        if store_id and store_id.upper() != 'ALL' and b['Store ID'] != store_id:
+            continue
+        if product_id and product_id.upper() != 'ALL' and b['Product ID'] != product_id:
+            continue
+        if category and category.upper() != 'ALL' and b['Category'].lower() != category.lower():
+            continue
+        if region and region.upper() != 'ALL' and b['Region'].lower() != region.lower():
+            continue
+        filtered_pairs.append(b)
+
+    if not filtered_pairs:
+        return {"success": True, "start_date": start_date, "end_date": end_date, "count": 0, "records": []}
+
+    macro_cols = feature_metadata.get("macro_features", [
+        'Price', 'Competitor Pricing', 'Inventory Level',
+        'Seasonality_Spring', 'Seasonality_Summer', 'Seasonality_Winter'
+    ])
+    transient_cols = feature_metadata.get("transient_features", [
+        'Promotion', 'Discount', 'Epidemic',
+        'Weather Condition_Rainy', 'Weather Condition_Snowy', 'Weather Condition_Sunny'
+    ])
+
+    season_map = {
+        12: 'Winter', 1: 'Winter', 2: 'Winter',
+        3: 'Spring', 4: 'Spring', 5: 'Spring',
+        6: 'Summer', 7: 'Summer', 8: 'Summer',
+        9: 'Autumn', 10: 'Autumn', 11: 'Autumn'
+    }
+
+    rows_macro = []
+    rows_transient = []
+    meta_list = []
+
+    for d in date_range:
+        d_str = d.strftime('%Y-%m-%d')
+        month = d.month
+        day_of_week = d.dayofweek
+
+        if seasonality and seasonality.upper() != 'ALL':
+            cur_season = seasonality
+        else:
+            cur_season = season_map.get(month, 'Summer')
+
+        if weather and weather.upper() != 'ALL':
+            cur_weather = weather
+        else:
+            if cur_season == 'Winter':
+                cur_weather = 'Snowy' if (d.day % 4 == 0) else ('Cloudy' if (d.day % 3 == 0) else 'Sunny')
+            elif cur_season == 'Summer':
+                cur_weather = 'Sunny' if (d.day % 5 != 0) else 'Rainy'
+            elif cur_season == 'Spring':
+                cur_weather = 'Sunny' if (d.day % 3 == 0) else 'Rainy'
+            else:
+                cur_weather = 'Rainy' if (d.day % 3 == 0) else 'Sunny'
+
+        is_weekend = day_of_week in [5, 6]
+
+        for p in filtered_pairs:
+            s_id = p['Store ID']
+            prod_id = p['Product ID']
+            cat = p['Category']
+            reg = p['Region']
+
+            price = float(p.get('Price', 50.0))
+            comp_price = float(p.get('Competitor Pricing', 50.0))
+            inv = float(p.get('Inventory Level', 100.0))
+            disc = float(p.get('Discount', 0.0))
+            promo = 1.0 if (is_weekend and d.day % 2 == 0) else float(p.get('Promotion', 0.0))
+
+            feat = {
+                'Price': price,
+                'Competitor Pricing': comp_price,
+                'Inventory Level': inv,
+                'Promotion': promo,
+                'Discount': disc,
+                'Epidemic': 0.0,
+                'Weather Condition': cur_weather,
+                'Seasonality': cur_season
+            }
+            m_row, t_row = prepare_feature_row(feat, macro_cols, transient_cols)
+            rows_macro.append(m_row)
+            rows_transient.append(t_row)
+            meta_list.append((d_str, s_id, prod_id, cat, reg, price, comp_price, inv, disc, promo, cur_weather, cur_season))
+
+    df_m = pd.DataFrame(rows_macro)[macro_cols]
+    df_t = pd.DataFrame(rows_transient)[transient_cols]
+
+    pred_cA = rf_trend.predict(df_m)
+    pred_cD = rf_spikes.predict(df_t)
+    demand_reconstructed = (pred_cA + pred_cD) / np.sqrt(2)
+
+    records = []
+    for idx, (cA, cD, dem) in enumerate(zip(pred_cA, pred_cD, demand_reconstructed)):
+        m = meta_list[idx]
+        records.append({
+            "date": m[0],
+            "storeId": m[1],
+            "productId": m[2],
+            "category": m[3],
+            "region": m[4],
+            "price": round(float(m[5]), 2),
+            "competitorPricing": round(float(m[6]), 2),
+            "inventoryLevel": round(float(m[7]), 2),
+            "discount": round(float(m[8]), 2),
+            "promotion": round(float(m[9]), 2),
+            "weatherCondition": m[10],
+            "seasonality": m[11],
+            "epidemic": 0.0,
+            "predicted_cA": round(float(cA), 2),
+            "predicted_cD": round(float(cD), 2),
+            "demand": max(5.0, round(float(dem), 2)),
+            "isForecast": True
+        })
+
+    return {
+        "success": True,
+        "start_date": start_date,
+        "end_date": end_date,
+        "count": len(records),
+        "records": records
+    }
+
 if __name__ == "__main__":
     import uvicorn
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
     uvicorn.run(app, host=host, port=port)
+

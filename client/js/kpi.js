@@ -50,12 +50,22 @@ class KpiManager {
     this.animateNumber('kpi-val-stores', kpiData.storeCount, 0);
     this.animateNumber('kpi-val-products', kpiData.productCount, 0);
 
-    // 2. Render Deltas
-    this.renderDelta('kpi-delta-total', kpiData.totalDemand, this.prevValues.totalDemand || 7800000);
-    this.renderDelta('kpi-delta-daily', kpiData.avgDailyDemand, this.prevValues.avgDailyDemand || 10200);
-    this.renderDelta('kpi-delta-record', kpiData.avgDemandPerRecord, this.prevValues.avgDemandPerRecord || 100);
-    this.renderDelta('kpi-delta-stores', kpiData.storeCount, kpiData.storeCount);
-    this.renderDelta('kpi-delta-products', kpiData.productCount, kpiData.productCount);
+    // 2. Render Deltas / Forecast indicators
+    if (kpiData.isForecast) {
+      const forecastTag = '<span class="kpi-delta" style="color:var(--accent-coral); background:rgba(255,107,74,0.12); border-radius:4px; padding:2px 6px; font-weight:600;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Projected</span>';
+      ['kpi-delta-total', 'kpi-delta-daily', 'kpi-delta-record'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = forecastTag;
+      });
+      this.renderDelta('kpi-delta-stores', kpiData.storeCount, kpiData.storeCount);
+      this.renderDelta('kpi-delta-products', kpiData.productCount, kpiData.productCount);
+    } else {
+      this.renderDelta('kpi-delta-total', kpiData.totalDemand, this.prevValues.totalDemand || 7800000);
+      this.renderDelta('kpi-delta-daily', kpiData.avgDailyDemand, this.prevValues.avgDailyDemand || 10200);
+      this.renderDelta('kpi-delta-record', kpiData.avgDemandPerRecord, this.prevValues.avgDemandPerRecord || 100);
+      this.renderDelta('kpi-delta-stores', kpiData.storeCount, kpiData.storeCount);
+      this.renderDelta('kpi-delta-products', kpiData.productCount, kpiData.productCount);
+    }
 
     // Store for next delta
     this.prevValues = { ...kpiData };
