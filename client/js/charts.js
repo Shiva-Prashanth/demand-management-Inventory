@@ -80,35 +80,65 @@ class ChartsManager {
     const peakDate = labels[maxDemandIdx];
     const peakValue = historicalDemand[maxDemandIdx];
 
-    // Optional Forecast Segment
-    let forecastLabels = [];
-    let forecastDemand = [];
-    let confUpper = [];
-    let confLower = [];
+    // Handle future forecast data vs historical vs mixed
+    const isPureForecast = seriesData.length > 0 && seriesData.every(d => d.isForecast);
+    const hasAnyForecast = seriesData.some(d => d.isForecast);
 
-    // Synthesize 14-day projection forward if forecastData is provided or generated
-    const lastDate = new Date(labels[labels.length - 1] || '2024-01-30');
-    const forecastCount = 14;
-    const baseDemand = historicalDemand[historicalDemand.length - 1] || 100;
+    let allLabels = [];
+    let nullPaddedHistorical = [];
+    let nullPaddedForecast = [];
+    let nullPaddedPrices = [];
+    let nullPaddedUpper = [];
+    let nullPaddedLower = [];
 
-    for (let i = 1; i <= forecastCount; i++) {
-      const fd = new Date(lastDate);
-      fd.setDate(fd.getDate() + i);
-      const fDateStr = fd.toISOString().slice(0, 10);
-      forecastLabels.push(fDateStr);
+    if (isPureForecast) {
+      // The entire active interval is Future AI Model Forecast (e.g. Jan 2026)
+      allLabels = labels;
+      nullPaddedHistorical = new Array(labels.length).fill(null);
+      nullPaddedForecast = seriesData.map(d => d.demand);
+      nullPaddedPrices = prices;
+      nullPaddedUpper = seriesData.map(d => Math.round(d.demand * 1.14));
+      nullPaddedLower = seriesData.map(d => Math.round(d.demand * 0.86));
+    } else if (hasAnyForecast) {
+      // Mixed mode: Historical data smoothly transitions into Future AI Forecast
+      allLabels = labels;
+      nullPaddedPrices = prices;
+      const splitIdx = seriesData.findIndex(d => d.isForecast);
 
-      const simVal = baseDemand * (1 + Math.sin(i * 0.4) * 0.12);
-      forecastDemand.push(Math.round(simVal));
-      confUpper.push(Math.round(simVal * 1.15));
-      confLower.push(Math.round(simVal * 0.85));
+      nullPaddedHistorical = seriesData.map((d, i) => (i <= splitIdx ? d.demand : null));
+      nullPaddedForecast = seriesData.map((d, i) => (i >= Math.max(0, splitIdx - 1) ? d.demand : null));
+      nullPaddedUpper = seriesData.map((d, i) => (i >= Math.max(0, splitIdx - 1) ? Math.round(d.demand * 1.14) : null));
+      nullPaddedLower = seriesData.map((d, i) => (i >= Math.max(0, splitIdx - 1) ? Math.round(d.demand * 0.86) : null));
+    } else {
+      // Pure historical interval: synthesize 14-day projection forward from last known date
+      const lastDate = new Date(labels[labels.length - 1] || '2024-01-30');
+      const forecastCount = 14;
+      const baseDemand = historicalDemand[historicalDemand.length - 1] || 100;
+
+      const forecastLabels = [];
+      const forecastDemand = [];
+      const confUpper = [];
+      const confLower = [];
+
+      for (let i = 1; i <= forecastCount; i++) {
+        const fd = new Date(lastDate);
+        fd.setDate(fd.getDate() + i);
+        const fDateStr = fd.toISOString().slice(0, 10);
+        forecastLabels.push(fDateStr);
+
+        const simVal = baseDemand * (1 + Math.sin(i * 0.4) * 0.12);
+        forecastDemand.push(Math.round(simVal));
+        confUpper.push(Math.round(simVal * 1.14));
+        confLower.push(Math.round(simVal * 0.86));
+      }
+
+      allLabels = [...labels, ...forecastLabels];
+      nullPaddedHistorical = [...historicalDemand, ...new Array(forecastCount).fill(null)];
+      nullPaddedPrices = [...prices, ...new Array(forecastCount).fill(null)];
+      nullPaddedForecast = [...new Array(labels.length - 1).fill(null), historicalDemand[historicalDemand.length - 1], ...forecastDemand];
+      nullPaddedUpper = [...new Array(labels.length - 1).fill(null), historicalDemand[historicalDemand.length - 1], ...confUpper];
+      nullPaddedLower = [...new Array(labels.length - 1).fill(null), historicalDemand[historicalDemand.length - 1], ...confLower];
     }
-
-    const allLabels = [...labels, ...forecastLabels];
-    const nullPaddedHistorical = [...historicalDemand, ...new Array(forecastCount).fill(null)];
-    const nullPaddedPrices = [...prices, ...new Array(forecastCount).fill(null)];
-    const nullPaddedForecast = [...new Array(labels.length - 1).fill(null), historicalDemand[historicalDemand.length - 1], ...forecastDemand];
-    const nullPaddedUpper = [...new Array(labels.length - 1).fill(null), historicalDemand[historicalDemand.length - 1], ...confUpper];
-    const nullPaddedLower = [...new Array(labels.length - 1).fill(null), historicalDemand[historicalDemand.length - 1], ...confLower];
 
     this.instances[canvasId] = new Chart(ctx, {
       type: 'line',
@@ -117,18 +147,18 @@ class ChartsManager {
         datasets: [
           // Upper Confidence Band (Shading target)
           {
-            label: 'Forecast Upper 90% CI',
+            label: isPureForecast ? 'Forecast 90% Upper CI' : 'Forecast Upper 90% CI',
             data: nullPaddedUpper,
             borderColor: 'transparent',
             backgroundColor: confFillColor,
             pointRadius: 0,
-            fill: '+1', // Fills to Lower Band below
+            fill: '+1',
             tension: 0.2,
             yAxisID: 'y'
           },
           // Lower Confidence Band
           {
-            label: 'Forecast Lower 90% CI',
+            label: isPureForecast ? 'Forecast 90% Lower CI' : 'Forecast Lower 90% CI',
             data: nullPaddedLower,
             borderColor: 'transparent',
             pointRadius: 0,
@@ -138,7 +168,7 @@ class ChartsManager {
           },
           // Forecast Line (Hot Coral Dashed)
           {
-            label: 'Forecast Projection (Coral)',
+            label: isPureForecast ? 'AI Projected Demand (Dual-RF db4)' : 'AI Forecast Projection',
             data: nullPaddedForecast,
             borderColor: colors.accentSecondary,
             borderWidth: 2.2,

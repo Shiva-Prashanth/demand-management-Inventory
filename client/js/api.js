@@ -4,7 +4,7 @@
  */
 
 const BASE_URL = window.location.protocol === 'file:'
-  ? 'http://localhost:5000/api'
+  ? 'http://localhost:5001/api'
   : '/api';
 
 async function request(endpoint, options = {}) {

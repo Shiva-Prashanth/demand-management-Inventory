@@ -79,6 +79,19 @@ class MLService {
       throw error;
     }
   }
+
+  async getForecastTimeline(params = {}) {
+    try {
+      const response = await this.client.get('/forecast-timeline', { params });
+      return response.data;
+    } catch (err) {
+      console.error('[MLService] Error fetching forecast timeline:', err.message);
+      const message = err.response?.data?.detail || err.message;
+      const error = new Error(`Forecast timeline error: ${message}`);
+      error.statusCode = err.response?.status || 500;
+      throw error;
+    }
+  }
 }
 
 module.exports = new MLService();

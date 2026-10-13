@@ -59,7 +59,7 @@ class DemandController {
         return res.json({ success: true, ready: true, data: cached, cached: true });
       }
 
-      const kpis = dataService.getKpis({
+      const kpis = await dataService.getKpis({
         storeId,
         productId,
         category,
@@ -92,7 +92,7 @@ class DemandController {
       }
 
       const { storeId, productId, category, region, weather, seasonality, from, to } = req.query;
-      const series = dataService.getTimeSeries({
+      const series = await dataService.getTimeSeries({
         storeId,
         productId,
         category,
@@ -135,7 +135,7 @@ class DemandController {
         });
       }
 
-      const aggregated = dataService.getAggregated(normalizedGroup, {
+      const aggregated = await dataService.getAggregated(normalizedGroup, {
         storeId,
         productId,
         category,
@@ -188,8 +188,8 @@ class DemandController {
         });
       }
 
-      const { page, limit, search, sortBy, sortOrder, storeId, productId, category, region } = req.query;
-      const result = dataService.getRawData({
+      const { page, limit, search, sortBy, sortOrder, storeId, productId, category, region, weather, seasonality, from, to } = req.query;
+      const result = await dataService.getRawData({
         page: page ? parseInt(page, 10) : 1,
         limit: limit ? parseInt(limit, 10) : 25,
         search: search || '',
@@ -198,7 +198,11 @@ class DemandController {
         storeId,
         productId,
         category,
-        region
+        region,
+        weather,
+        seasonality,
+        from,
+        to
       });
 
       res.json({
