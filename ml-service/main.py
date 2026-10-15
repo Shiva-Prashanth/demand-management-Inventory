@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import warnings
-from typing import List, Dict, Any, Union, Optional
+from typing import List, Dict, Any, Union, Optional, Tuple
 import numpy as np
 import pandas as pd
 import pywt
@@ -140,7 +140,7 @@ def get_feature_importance():
         raise HTTPException(status_code=404, detail="Feature importance data not found. Please train models first.")
     return importance_data
 
-def prepare_feature_row(feat_dict: Dict[str, Any], macro_cols: List[str], transient_cols: List[str]) -> (Dict[str, float], Dict[str, float]):
+def prepare_feature_row(feat_dict: Dict[str, Any], macro_cols: List[str], transient_cols: List[str]) -> Tuple[Dict[str, float], Dict[str, float]]:
     price = float(feat_dict.get("Price", feat_dict.get("price", 50.0)))
     comp_price = float(feat_dict.get("Competitor Pricing", feat_dict.get("Competitor_Pricing", feat_dict.get("competitorPricing", 50.0))))
     inv_level = float(feat_dict.get("Inventory Level", feat_dict.get("Inventory_Level", feat_dict.get("inventoryLevel", 100.0))))
@@ -219,7 +219,9 @@ def predict(request: PredictRequest):
     pred_cD = rf_spikes.predict(df_transient)
 
     num_samples = len(pred_cA)
-    if num_samples >= 4:
+    # db4 filter length is 8; idwt output length < input length when n < 8,
+    # causing silent truncation. Use the fast approximation for small batches.
+    if num_samples >= 8:
         reconstructed = pywt.idwt(pred_cA, pred_cD, 'db4')[:num_samples]
     else:
         reconstructed = (pred_cA + pred_cD) / np.sqrt(2)
@@ -431,7 +433,13 @@ def forecast_timeline(
 
     pred_cA = rf_trend.predict(df_m)
     pred_cD = rf_spikes.predict(df_t)
-    demand_reconstructed = (pred_cA + pred_cD) / np.sqrt(2)
+    # Use idwt when we have enough samples (db4 filter length = 8); otherwise
+    # fall back to the fast approximation — same logic as /predict endpoint.
+    n_total = len(pred_cA)
+    if n_total >= 8:
+        demand_reconstructed = pywt.idwt(pred_cA, pred_cD, 'db4')[:n_total]
+    else:
+        demand_reconstructed = (pred_cA + pred_cD) / np.sqrt(2)
 
     records = []
     for idx, (cA, cD, dem) in enumerate(zip(pred_cA, pred_cD, demand_reconstructed)):
